@@ -47,6 +47,9 @@ public:
 	// End modifying vertex buffer data.
 	virtual void EndModifyVertexBuffer(void* bufferHandle) = 0;
 
+	// Get the texture that's created natively
+	virtual void* getNativeTexture() { return nullptr; }
+
 	// --------------------------------------------------------------------------
 	// DX12 plugin specific functions
 	// --------------------------------------------------------------------------
@@ -81,6 +84,8 @@ public:
 	virtual unsigned int getSyncInterval() { return 0; }
 	virtual unsigned int getBackbufferWidth() { return 0;  }
 	virtual unsigned int getBackbufferHeight() { return 0; }
+
+	virtual void createTexture() {}
 };
 
 

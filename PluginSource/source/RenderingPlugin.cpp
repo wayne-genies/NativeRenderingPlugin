@@ -176,12 +176,17 @@ static void DrawColoredTriangle()
 	{
 		float x, y, z;
 		unsigned int color;
+		float u, v;
+
 	};
-	MyVertex verts[3] =
+	MyVertex verts[6] =
 	{
-		{ -0.5f, -0.25f,  0, 0xFFff0000 },
-		{ 0.5f, -0.25f,  0, 0xFF00ff00 },
-		{ 0,     0.5f ,  0, 0xFF0000ff },
+		{ -0.5f, -0.5f,  0, 0xFFff0000, 0.f, 0.f},
+		{  0.5f, -0.5f,  0, 0xFF00ff00, 1.f, 0.f},
+		{  0.5f,  0.5f,  0, 0xFF0000ff, 1.f, 1.f},
+		{ -0.5f, -0.5f,  0, 0xFFff0000, 0.f, 0.f},
+		{  0.5f,  0.5f,  0, 0xFF0000ff, 1.f, 1.f},
+		{ -0.5f,  0.5f,  0, 0xFF00ff00, 0.f, 1.f},
 	};
 
 	// Transformation matrix: rotate around Z axis based on time.
@@ -197,7 +202,7 @@ static void DrawColoredTriangle()
 		0,0,finalDepth,1,
 	};
 
-	s_CurrentAPI->DrawSimpleTriangles(worldMatrix, 1, verts);
+	s_CurrentAPI->DrawSimpleTriangles(worldMatrix, 2, verts);
 }
 
 
@@ -328,6 +333,12 @@ static void UNITY_INTERFACE_API OnRenderEvent(int eventID)
 extern "C" UnityRenderingEvent UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API GetRenderEventFunc()
 {
 	return OnRenderEvent;
+}
+
+
+extern "C" UNITY_INTERFACE_EXPORT void* UNITY_INTERFACE_API GetNativeTexture()
+{
+	return s_CurrentAPI->getNativeTexture();
 }
 
 // --------------------------------------------------------------------------

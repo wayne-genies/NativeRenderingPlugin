@@ -59,6 +59,9 @@ public class UseRenderingPlugin : MonoBehaviour
     private static extern IntPtr GetRenderTexture();
 
     [DllImport("RenderingPlugin")]
+    private static extern IntPtr GetNativeTexture();
+
+    [DllImport("RenderingPlugin")]
     private static extern void SetRenderTexture(IntPtr rb);
 
     [DllImport("RenderingPlugin")]
@@ -100,11 +103,19 @@ public class UseRenderingPlugin : MonoBehaviour
 #if PLATFORM_SWITCH && !UNITY_EDITOR
         RegisterPlugin();
 #endif
+        Debug.Log(SystemInfo.graphicsDeviceType);
+        
 
         if (SystemInfo.graphicsDeviceType == GraphicsDeviceType.Direct3D12)
         {
             CreateRenderTexture();
         }
+
+        IntPtr texHandle = GetNativeTexture();
+        Texture2D renderTex = Texture2D.CreateExternalTexture(512, 512, TextureFormat.RGBA32, false, false, texHandle);
+        GameObject sphere = GameObject.Find("Sphere");
+        sphere.transform.rotation = Quaternion.Euler(0.0f, 180.0f, 0.0f);
+        sphere.GetComponent<Renderer>().material.mainTexture = renderTex;
 
         CreateTextureAndPassToPlugin();
         SendMeshBuffersToPlugin();
