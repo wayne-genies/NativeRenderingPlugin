@@ -176,6 +176,21 @@ struct VulkanBuffer
     VkMemoryPropertyFlags deviceMemoryFlags;
 };
 
+struct VulkanImage
+{
+	VkImage image;
+	VkDeviceMemory deviceMemory;
+	VkImageView imageView;
+	VkSampler sampler;
+	VkFormat format;
+	uint32_t width;
+	uint32_t height;
+	uint32_t mipLevels;
+	VkImageLayout imageLayout;
+	VkImageAspectFlags aspectMask;
+	VkMemoryPropertyFlags deviceMemoryFlags;
+};
+
 static VkPipelineLayout CreateTrianglePipelineLayout(VkDevice device, VkDescriptorSetLayout& descriptorSetLayout)
 {
     VkPushConstantRange pushConstantRange;
@@ -544,14 +559,15 @@ private:
 private:
     bool CreateVulkanBuffer(size_t bytes, VulkanBuffer* buffer, VkBufferUsageFlags usage);
     void ImmediateDestroyVulkanBuffer(const VulkanBuffer& buffer);
+	void ImmediateDestroyVulkanImage(const VulkanImage& image);
     void SafeDestroy(unsigned long long frameNumber, const VulkanBuffer& buffer);
     void GarbageCollect(bool force = false);
     void TransitionLayout(VkImage image, VkFormat format, VkImageLayout oldLayout, VkImageLayout newLayout);
     void CreateVulkanImage(int texWidth, int texHeight, VkFormat format, VkImage& image, VkDeviceMemory& imageMemory);
     void CreateCommandPool();
-    void CreateTextureImage();
-    void CreateTextureImageView();
-    void CreateTextureSampler();
+	void CreateTextureImage(const char* filename, VulkanImage& image);
+    void CreateTextureImageView(VulkanImage& image);
+    void CreateTextureSampler(VulkanImage& image);
     void CreateDescriptorSetLayout();
     void CreateDescriptorPool();
     void CreateDescriptorSets();
@@ -570,10 +586,7 @@ private:
     VkRenderPass m_TrianglePipelineRenderPass;
 
     VkCommandPool m_CommandPool;
-    VkImage m_Image;
-    VkDeviceMemory m_ImageMemory;
-    VkImageView m_ImageView;
-    VkSampler m_ImageSampler;
+    VulkanImage m_Image1;
 
     VkDescriptorSetLayout m_DescriptorSetLayout;
     VkDescriptorPool m_DescriptorPool;
@@ -593,14 +606,10 @@ RenderAPI_Vulkan::RenderAPI_Vulkan()
     , m_TrianglePipelineLayout(VK_NULL_HANDLE)
     , m_TrianglePipeline(VK_NULL_HANDLE)
     , m_TrianglePipelineRenderPass(VK_NULL_HANDLE)
-    , m_Image(VK_NULL_HANDLE)
-    , m_ImageMemory(VK_NULL_HANDLE)
     , m_CommandPool(VK_NULL_HANDLE)
-    , m_ImageView(VK_NULL_HANDLE)
-    , m_ImageSampler(VK_NULL_HANDLE)
     , m_DescriptorSetLayout(VK_NULL_HANDLE)
     , m_DescriptorPool(VK_NULL_HANDLE)
-
+    , m_Image1()
 {
 }
 
@@ -643,26 +652,7 @@ void RenderAPI_Vulkan::ProcessDeviceEvent(UnityGfxDeviceEventType type, IUnityIn
                 vkDestroyPipelineLayout(m_Instance.device, m_TrianglePipelineLayout, NULL);
                 m_TrianglePipelineLayout = VK_NULL_HANDLE;
             }
-            if (m_Image != VK_NULL_HANDLE)
-            {
-                vkDestroyImage(m_Instance.device, m_Image, NULL);
-                m_Image = VK_NULL_HANDLE;
-            }
-            if (m_ImageMemory != VK_NULL_HANDLE)
-            {
-                vkFreeMemory(m_Instance.device, m_ImageMemory, NULL);
-                m_ImageMemory = VK_NULL_HANDLE;
-            }
-            if (m_ImageView != VK_NULL_HANDLE)
-            {
-                vkDestroyImageView(m_Instance.device, m_ImageView, NULL);
-                m_ImageView = VK_NULL_HANDLE;
-            }
-            if (m_ImageSampler != VK_NULL_HANDLE)
-            {
-                vkDestroySampler(m_Instance.device, m_ImageSampler, NULL);
-                m_ImageView = VK_NULL_HANDLE;
-            }
+			ImmediateDestroyVulkanImage(m_Image1);
             if (m_DescriptorPool != VK_NULL_HANDLE)
             {
                 vkDestroyDescriptorPool(m_Instance.device, m_DescriptorPool, NULL);
@@ -699,16 +689,14 @@ void RenderAPI_Vulkan::drawToRenderTexture()
 
 void* RenderAPI_Vulkan::getNativeTexture()
 {
-    return &m_Image;
+    return &m_Image1.image;
 }
 
 
 void RenderAPI_Vulkan::InitResources()
 {
     CreateCommandPool();
-    CreateTextureImage();
-    CreateTextureImageView();
-    CreateTextureSampler();
+    CreateTextureImage("C:\\Users\\wayne\\OneDrive\\Pictures\\texture.jpg", m_Image1);
     CreateDescriptorSetLayout();
     CreateDescriptorPool();
     CreateDescriptorSets();
@@ -767,10 +755,10 @@ void RenderAPI_Vulkan::CreateDescriptorSets()
     // Update descriptor set
     VkDescriptorImageInfo imageInfo{};
     imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-    imageInfo.imageView = m_ImageView;
-    imageInfo.sampler = m_ImageSampler;
+    imageInfo.imageView = m_Image1.imageView;
+    imageInfo.sampler = m_Image1.sampler;
 
-    VkWriteDescriptorSet descriptorWrite;
+    VkWriteDescriptorSet descriptorWrite{};
     descriptorWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
     descriptorWrite.dstSet = m_DescriptorSets[0];
     descriptorWrite.dstBinding = 0;
@@ -782,25 +770,25 @@ void RenderAPI_Vulkan::CreateDescriptorSets()
     vkUpdateDescriptorSets(m_Instance.device, 1, &descriptorWrite, 0, nullptr);
 }
 
-void RenderAPI_Vulkan::CreateTextureImageView()
+void RenderAPI_Vulkan::CreateTextureImageView(VulkanImage& image)
 {
     VkImageViewCreateInfo viewInfo{};
     viewInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
-    viewInfo.image = m_Image;
+    viewInfo.image = image.image;
     viewInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
-    viewInfo.format = VK_FORMAT_R8G8B8A8_SRGB;
-    viewInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+    viewInfo.format = image.format;
+    viewInfo.subresourceRange.aspectMask = image.aspectMask;
     viewInfo.subresourceRange.baseMipLevel = 0;
     viewInfo.subresourceRange.levelCount = 1;
     viewInfo.subresourceRange.baseArrayLayer = 0;
     viewInfo.subresourceRange.layerCount = 1;
 
-    if (vkCreateImageView(m_Instance.device, &viewInfo, nullptr, &m_ImageView) != VK_SUCCESS) {
+    if (vkCreateImageView(m_Instance.device, &viewInfo, nullptr, &image.imageView) != VK_SUCCESS) {
         throw std::runtime_error("Failed to create image view.");
     }
 }
 
-void RenderAPI_Vulkan::CreateTextureSampler()
+void RenderAPI_Vulkan::CreateTextureSampler(VulkanImage& image)
 {
     VkSamplerCreateInfo samplerInfo{};
     samplerInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
@@ -824,7 +812,7 @@ void RenderAPI_Vulkan::CreateTextureSampler()
     samplerInfo.minLod = 0.0f;
     samplerInfo.maxLod = 0.0f;
 
-    if (vkCreateSampler(m_Instance.device, &samplerInfo, nullptr, &m_ImageSampler) != VK_SUCCESS) {
+    if (vkCreateSampler(m_Instance.device, &samplerInfo, nullptr, &image.sampler) != VK_SUCCESS) {
         throw std::runtime_error("failed to create texture sampler!");
     }
 }
@@ -1027,16 +1015,20 @@ void RenderAPI_Vulkan::CopyFromBuffer(VulkanBuffer& buffer, VkImage& image, uint
 }
 
 
-void RenderAPI_Vulkan::CreateTextureImage()
+void RenderAPI_Vulkan::CreateTextureImage(const char* filename, VulkanImage& image)
 {
     int texWidth, texHeight, texChannels;
-    stbi_uc* pixels = stbi_load("C:\\Users\\wayne\\OneDrive\\Pictures\\texture.jpg", &texWidth, &texHeight, &texChannels, STBI_rgb_alpha);
-    VkDeviceSize imageSize = texWidth * texHeight * 4;
-
+    stbi_uc* pixels = stbi_load(filename, &texWidth, &texHeight, &texChannels, STBI_rgb_alpha);
     if (!pixels) {
         throw std::runtime_error(stbi_failure_reason());
     }
 
+    image.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+    image.format = VK_FORMAT_R8G8B8A8_SRGB;
+    image.width = texWidth;
+    image.height = texHeight;
+
+    VkDeviceSize imageSize = texWidth * texHeight * 4;
     VulkanBuffer stagingBuffer;
     if (!CreateVulkanBuffer(imageSize, &stagingBuffer, VK_BUFFER_USAGE_TRANSFER_SRC_BIT))
         throw std::runtime_error("Failed to create staging buffer");
@@ -1047,19 +1039,22 @@ void RenderAPI_Vulkan::CreateTextureImage()
 
     VkFormat format = VK_FORMAT_R8G8B8A8_SRGB;
 
-    CreateVulkanImage(texWidth, texHeight, format, m_Image, m_ImageMemory);
+    CreateVulkanImage(texWidth, texHeight, format, image.image, image.deviceMemory);
 
     // Change layout for transferring
-    TransitionLayout(m_Image, format, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+    TransitionLayout(image.image, format, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
     
     // Copy from Buffer
-    CopyFromBuffer(stagingBuffer, m_Image, static_cast<uint32_t>(texWidth), static_cast<uint32_t>(texHeight));
+    CopyFromBuffer(stagingBuffer, image.image, static_cast<uint32_t>(texWidth), static_cast<uint32_t>(texHeight));
     
     // Change layout for shader access
-    TransitionLayout(m_Image, format, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+    TransitionLayout(image.image, format, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 
     // Clean up
     ImmediateDestroyVulkanBuffer(stagingBuffer);
+
+    CreateTextureImageView(image);
+    CreateTextureSampler(image);
 }
 
 
@@ -1125,6 +1120,18 @@ bool RenderAPI_Vulkan::CreateVulkanBuffer(size_t sizeInBytes, VulkanBuffer* buff
     buffer->deviceMemorySize = memoryAllocateInfo.allocationSize;
 
     return true;
+}
+
+void RenderAPI_Vulkan::ImmediateDestroyVulkanImage(const VulkanImage& image)
+{
+	if (image.image != VK_NULL_HANDLE)
+		vkDestroyImage(m_Instance.device, image.image, NULL);
+	if (image.deviceMemory != VK_NULL_HANDLE)
+		vkFreeMemory(m_Instance.device, image.deviceMemory, NULL);
+	if (image.imageView != VK_NULL_HANDLE)
+		vkDestroyImageView(m_Instance.device, image.imageView, NULL);
+	if (image.sampler != VK_NULL_HANDLE)
+		vkDestroySampler(m_Instance.device, image.sampler, NULL);
 }
 
 void RenderAPI_Vulkan::ImmediateDestroyVulkanBuffer(const VulkanBuffer& buffer)
