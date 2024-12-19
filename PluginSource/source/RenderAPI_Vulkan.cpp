@@ -211,12 +211,12 @@ static VkPipelineLayout CreateTrianglePipelineLayout(VkDevice device, VkDescript
 namespace Shader {
 // Source of vertex shader (filename: shader.vert)
 /*
-#version 310 es
-layout(location = 0) in highp vec3 vpos;
-layout(location = 1) in highp vec4 vcol;
-layout(location = 2) in highp vec2 vtex;
-layout(location = 0) out highp vec4 color;
-layout(location = 1) out highp vec2 ftex;
+#version 450
+layout(location = 0) in vec3 vpos;
+layout(location = 1) in vec4 vcol;
+layout(location = 2) in vec2 vtex;
+layout(location = 0) out vec4 color;
+layout(location = 1) out vec2 ftex;
 layout(push_constant) uniform PushConstants { mat4 matrix; };
 void main() {
     gl_Position = matrix * vec4(vpos, 1.0);
@@ -227,13 +227,14 @@ void main() {
 
 // Source of fragment shader (filename: shader.frag)
 /*
-#version 310 es
-layout(location = 0) out highp vec4 fragColor;
-layout(location = 1) in highp vec2 fragTexCoord;
-layout(location = 0) in highp vec4 color;
-layout(set = 1, binding = 1) uniform sampler2D texSampler;
+#version 450
+layout(location = 0) out vec4 fragColor;
+layout(location = 0) in vec4 color;
+layout(location = 1) in vec2 ftex;
+layout(binding = 0) uniform sampler2D tex1Sampler;
+layout(binding = 1) uniform sampler2D tex2Sampler;
 
-void main() { fragColor = texture(texSampler, fragTexCoord); }
+void main() { fragColor = texture(tex2Sampler, ftex); }
 */
 // compiled to SPIR-V using:
 // %VULKAN_SDK%\bin\glslc -mfmt=num shader.frag shader.vert -c
@@ -332,15 +333,14 @@ const uint32_t vertexShaderSpirv[] = {
 0x00000026,0x0004003d,0x00000027,0x0000002c,
 0x0000002b,0x0003003e,0x00000029,0x0000002c,
 0x000100fd,0x00010038
-
 };
 const uint32_t fragmentShaderSpirv[] = {
-0x07230203,0x00010000,0x000d000b,0x00000016,
+0x07230203,0x00010000,0x000d000b,0x0000001d,
 0x00000000,0x00020011,0x00000001,0x0006000b,
 0x00000001,0x4c534c47,0x6474732e,0x3035342e,
 0x00000000,0x0003000e,0x00000000,0x00000001,
 0x0008000f,0x00000004,0x00000004,0x6e69616d,
-0x00000000,0x00000009,0x00000011,0x00000015,
+0x00000000,0x00000009,0x00000011,0x0000001c,
 0x00030010,0x00000004,0x00000007,0x00030003,
 0x00000002,0x000001c2,0x000a0004,0x475f4c47,
 0x4c474f4f,0x70635f45,0x74735f70,0x5f656c79,
@@ -349,37 +349,47 @@ const uint32_t fragmentShaderSpirv[] = {
 0x64756c63,0x69645f65,0x74636572,0x00657669,
 0x00040005,0x00000004,0x6e69616d,0x00000000,
 0x00050005,0x00000009,0x67617266,0x6f6c6f43,
-0x00000072,0x00050005,0x0000000d,0x53786574,
-0x6c706d61,0x00007265,0x00040005,0x00000011,
-0x78657466,0x00000000,0x00040005,0x00000015,
-0x6f6c6f63,0x00000072,0x00040047,0x00000009,
-0x0000001e,0x00000000,0x00040047,0x0000000d,
-0x00000021,0x00000000,0x00040047,0x0000000d,
-0x00000022,0x00000000,0x00040047,0x00000011,
-0x0000001e,0x00000001,0x00040047,0x00000015,
-0x0000001e,0x00000000,0x00020013,0x00000002,
-0x00030021,0x00000003,0x00000002,0x00030016,
-0x00000006,0x00000020,0x00040017,0x00000007,
-0x00000006,0x00000004,0x00040020,0x00000008,
-0x00000003,0x00000007,0x0004003b,0x00000008,
-0x00000009,0x00000003,0x00090019,0x0000000a,
-0x00000006,0x00000001,0x00000000,0x00000000,
-0x00000000,0x00000001,0x00000000,0x0003001b,
-0x0000000b,0x0000000a,0x00040020,0x0000000c,
-0x00000000,0x0000000b,0x0004003b,0x0000000c,
-0x0000000d,0x00000000,0x00040017,0x0000000f,
-0x00000006,0x00000002,0x00040020,0x00000010,
-0x00000001,0x0000000f,0x0004003b,0x00000010,
-0x00000011,0x00000001,0x00040020,0x00000014,
-0x00000001,0x00000007,0x0004003b,0x00000014,
-0x00000015,0x00000001,0x00050036,0x00000002,
-0x00000004,0x00000000,0x00000003,0x000200f8,
-0x00000005,0x0004003d,0x0000000b,0x0000000e,
-0x0000000d,0x0004003d,0x0000000f,0x00000012,
-0x00000011,0x00050057,0x00000007,0x00000013,
-0x0000000e,0x00000012,0x0003003e,0x00000009,
-0x00000013,0x000100fd,0x00010038
-
+0x00000072,0x00050005,0x0000000d,0x31786574,
+0x706d6153,0x0072656c,0x00040005,0x00000011,
+0x78657466,0x00000000,0x00050005,0x00000014,
+0x32786574,0x706d6153,0x0072656c,0x00040005,
+0x0000001c,0x6f6c6f63,0x00000072,0x00040047,
+0x00000009,0x0000001e,0x00000000,0x00040047,
+0x0000000d,0x00000021,0x00000000,0x00040047,
+0x0000000d,0x00000022,0x00000000,0x00040047,
+0x00000011,0x0000001e,0x00000001,0x00040047,
+0x00000014,0x00000021,0x00000001,0x00040047,
+0x00000014,0x00000022,0x00000000,0x00040047,
+0x0000001c,0x0000001e,0x00000000,0x00020013,
+0x00000002,0x00030021,0x00000003,0x00000002,
+0x00030016,0x00000006,0x00000020,0x00040017,
+0x00000007,0x00000006,0x00000004,0x00040020,
+0x00000008,0x00000003,0x00000007,0x0004003b,
+0x00000008,0x00000009,0x00000003,0x00090019,
+0x0000000a,0x00000006,0x00000001,0x00000000,
+0x00000000,0x00000000,0x00000001,0x00000000,
+0x0003001b,0x0000000b,0x0000000a,0x00040020,
+0x0000000c,0x00000000,0x0000000b,0x0004003b,
+0x0000000c,0x0000000d,0x00000000,0x00040017,
+0x0000000f,0x00000006,0x00000002,0x00040020,
+0x00000010,0x00000001,0x0000000f,0x0004003b,
+0x00000010,0x00000011,0x00000001,0x0004003b,
+0x0000000c,0x00000014,0x00000000,0x0004002b,
+0x00000006,0x00000019,0x3f000000,0x00040020,
+0x0000001b,0x00000001,0x00000007,0x0004003b,
+0x0000001b,0x0000001c,0x00000001,0x00050036,
+0x00000002,0x00000004,0x00000000,0x00000003,
+0x000200f8,0x00000005,0x0004003d,0x0000000b,
+0x0000000e,0x0000000d,0x0004003d,0x0000000f,
+0x00000012,0x00000011,0x00050057,0x00000007,
+0x00000013,0x0000000e,0x00000012,0x0004003d,
+0x0000000b,0x00000015,0x00000014,0x0004003d,
+0x0000000f,0x00000016,0x00000011,0x00050057,
+0x00000007,0x00000017,0x00000015,0x00000016,
+0x00050081,0x00000007,0x00000018,0x00000013,
+0x00000017,0x0005008e,0x00000007,0x0000001a,
+0x00000018,0x00000019,0x0003003e,0x00000009,
+0x0000001a,0x000100fd,0x00010038
 };
 } // namespace Shader
 
@@ -587,6 +597,7 @@ private:
 
     VkCommandPool m_CommandPool;
     VulkanImage m_Image1;
+    VulkanImage m_Image2;
 
     VkDescriptorSetLayout m_DescriptorSetLayout;
     VkDescriptorPool m_DescriptorPool;
@@ -610,6 +621,7 @@ RenderAPI_Vulkan::RenderAPI_Vulkan()
     , m_DescriptorSetLayout(VK_NULL_HANDLE)
     , m_DescriptorPool(VK_NULL_HANDLE)
     , m_Image1()
+    , m_Image2()
 {
 }
 
@@ -653,6 +665,7 @@ void RenderAPI_Vulkan::ProcessDeviceEvent(UnityGfxDeviceEventType type, IUnityIn
                 m_TrianglePipelineLayout = VK_NULL_HANDLE;
             }
 			ImmediateDestroyVulkanImage(m_Image1);
+			ImmediateDestroyVulkanImage(m_Image2);
             if (m_DescriptorPool != VK_NULL_HANDLE)
             {
                 vkDestroyDescriptorPool(m_Instance.device, m_DescriptorPool, NULL);
@@ -689,7 +702,7 @@ void RenderAPI_Vulkan::drawToRenderTexture()
 
 void* RenderAPI_Vulkan::getNativeTexture()
 {
-    return &m_Image1.image;
+    return &m_Image2.image;
 }
 
 
@@ -697,6 +710,7 @@ void RenderAPI_Vulkan::InitResources()
 {
     CreateCommandPool();
     CreateTextureImage("C:\\Users\\wayne\\OneDrive\\Pictures\\texture.jpg", m_Image1);
+    CreateTextureImage("C:\\Users\\wayne\\OneDrive\\Pictures\\swirl.png", m_Image2);
     CreateDescriptorSetLayout();
     CreateDescriptorPool();
     CreateDescriptorSets();
@@ -704,17 +718,27 @@ void RenderAPI_Vulkan::InitResources()
 
 void RenderAPI_Vulkan::CreateDescriptorSetLayout()
 {
-    VkDescriptorSetLayoutBinding samplerLayoutBinding{};
-    samplerLayoutBinding.binding = 0;
-    samplerLayoutBinding.descriptorCount = 1;
-    samplerLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-    samplerLayoutBinding.pImmutableSamplers = nullptr;
-    samplerLayoutBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+    VkDescriptorSetLayoutBinding samplerLayoutBinding1{};
+    samplerLayoutBinding1.binding = 0;
+    samplerLayoutBinding1.descriptorCount = 1;
+    samplerLayoutBinding1.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+    samplerLayoutBinding1.pImmutableSamplers = nullptr;
+    samplerLayoutBinding1.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+    
+    // Create another sampler layout binding for the second image
+	VkDescriptorSetLayoutBinding samplerLayoutBinding2{};
+	samplerLayoutBinding2.binding = 1;
+	samplerLayoutBinding2.descriptorCount = 1;
+	samplerLayoutBinding2.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+	samplerLayoutBinding2.pImmutableSamplers = nullptr;
+	samplerLayoutBinding2.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+
+	std::vector<VkDescriptorSetLayoutBinding>bindings = { samplerLayoutBinding1, samplerLayoutBinding2 };
 
     VkDescriptorSetLayoutCreateInfo layoutInfo{};
     layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-    layoutInfo.bindingCount = 1;
-    layoutInfo.pBindings = &samplerLayoutBinding;
+    layoutInfo.bindingCount = static_cast<uint32_t>(bindings.size());
+    layoutInfo.pBindings = bindings.data();
 
     if (vkCreateDescriptorSetLayout(m_Instance.device, &layoutInfo, nullptr, &m_DescriptorSetLayout) != VK_SUCCESS)
     {
@@ -725,7 +749,8 @@ void RenderAPI_Vulkan::CreateDescriptorSetLayout()
 void RenderAPI_Vulkan::CreateDescriptorPool()
 {
     std::vector<VkDescriptorPoolSize> poolSizes = {
-        { VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1 }
+		{ VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1 },
+		{ VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1 }
     };
 
     VkDescriptorPoolCreateInfo poolInfo = {};
@@ -753,21 +778,32 @@ void RenderAPI_Vulkan::CreateDescriptorSets()
         throw std::runtime_error("Failed to allocate descriptor sets!");
 
     // Update descriptor set
-    VkDescriptorImageInfo imageInfo{};
-    imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-    imageInfo.imageView = m_Image1.imageView;
-    imageInfo.sampler = m_Image1.sampler;
+    VkDescriptorImageInfo imageInfo[2];
+    imageInfo[0].imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+    imageInfo[0].imageView = m_Image1.imageView;
+    imageInfo[0].sampler = m_Image1.sampler;
+	imageInfo[1].imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+	imageInfo[1].imageView = m_Image2.imageView;
+	imageInfo[1].sampler = m_Image2.sampler;
 
-    VkWriteDescriptorSet descriptorWrite{};
-    descriptorWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-    descriptorWrite.dstSet = m_DescriptorSets[0];
-    descriptorWrite.dstBinding = 0;
-    descriptorWrite.dstArrayElement = 0;
-    descriptorWrite.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-    descriptorWrite.descriptorCount = 1;
-    descriptorWrite.pImageInfo = &imageInfo;
+    std::vector<VkWriteDescriptorSet> descriptorWrites(2);
+    descriptorWrites[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+    descriptorWrites[0].dstSet = m_DescriptorSets[0];
+    descriptorWrites[0].dstBinding = 0;
+    descriptorWrites[0].dstArrayElement = 0;
+    descriptorWrites[0].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+    descriptorWrites[0].descriptorCount = 1;
+    descriptorWrites[0].pImageInfo = &imageInfo[0];
 
-    vkUpdateDescriptorSets(m_Instance.device, 1, &descriptorWrite, 0, nullptr);
+	descriptorWrites[1].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+	descriptorWrites[1].dstSet = m_DescriptorSets[0];
+	descriptorWrites[1].dstBinding = 1;
+	descriptorWrites[1].dstArrayElement = 0;
+	descriptorWrites[1].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+	descriptorWrites[1].descriptorCount = 1;
+	descriptorWrites[1].pImageInfo = &imageInfo[1];
+
+    vkUpdateDescriptorSets(m_Instance.device, static_cast<uint32_t>(descriptorWrites.size()), descriptorWrites.data(), 0, nullptr);
 }
 
 void RenderAPI_Vulkan::CreateTextureImageView(VulkanImage& image)
