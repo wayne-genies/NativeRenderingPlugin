@@ -12,6 +12,10 @@
 #define STB_IMAGE_IMPLEMENTATION
 #include "stb/stb_image.h"
 
+// Embedded images
+#include "images/texture.h"
+#include "images/swirl.h"
+
 // This plugin does not link to the Vulkan loader, easier to support multiple APIs and systems that don't have Vulkan support
 #define VK_NO_PROTOTYPES
 #include "Unity/IUnityGraphicsVulkan.h"
@@ -577,6 +581,7 @@ private:
     void CreateVulkanImage(VulkanImage& image);
     void CreateCommandPool();
 	void CreateTextureImage(const char* filename, VulkanImage& image);
+    void CreateTextureImage(const unsigned char* pixels, const uint32_t width, const uint32_t height, VulkanImage& image);
     void CreateTextureImageView(VulkanImage& image);
     void CreateTextureSampler(VulkanImage& image);
     void CreateDescriptorSetLayout();
@@ -637,7 +642,7 @@ void RenderAPI_Vulkan::ProcessDeviceEvent(UnityGfxDeviceEventType type, IUnityIn
         LoadVulkanAPI(m_Instance.getInstanceProcAddr, m_Instance.instance);
 
         // Create Vulkan resources
-        createTextures("C:\\Users\\wayne\\OneDrive\\Pictures\\texture.jpg", "C:\\Users\\wayne\\OneDrive\\Pictures\\swirl.png");
+        // createTextures("C:\\Users\\wayne\\OneDrive\\Pictures\\texture.jpg", "C:\\Users\\wayne\\OneDrive\\Pictures\\swirl.png");
 
         UnityVulkanPluginEventConfig config_1;
         config_1.graphicsQueueAccess = kUnityVulkanGraphicsQueueAccess_DontCare;
@@ -714,10 +719,12 @@ void RenderAPI_Vulkan::createTextures(const char* image1, const char* image2)
 
 	// Create texture image
     ImmediateDestroyVulkanImage(m_Image1);
-	CreateTextureImage(image1, m_Image1);
+	//CreateTextureImage(image1, m_Image1);
+	CreateTextureImage(texture_img::image_data, 512, 512, m_Image1);
 
 	ImmediateDestroyVulkanImage(m_Image2);
-	CreateTextureImage(image2, m_Image2);
+	//CreateTextureImage(image2, m_Image2);
+	CreateTextureImage(swirl_img::image_data, 512, 512, m_Image2);
 
     if (m_DescriptorSetLayout == VK_NULL_HANDLE)
 		CreateDescriptorSetLayout();  // Reuse Descriptor Set Layout
@@ -1064,12 +1071,45 @@ void RenderAPI_Vulkan::CopyFromBuffer(VulkanBuffer& buffer, VkImage& image, uint
 }
 
 
+void RenderAPI_Vulkan::CreateTextureImage(const unsigned char* pixels, const uint32_t width, const uint32_t height, VulkanImage& image)
+{
+    image.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+    image.format = VK_FORMAT_R8G8B8A8_SRGB;
+    image.width = width;
+    image.height = height;
+
+    VkDeviceSize imageSize = width * height * 4;
+    VulkanBuffer stagingBuffer;
+    if (!CreateVulkanBuffer(imageSize, &stagingBuffer, VK_BUFFER_USAGE_TRANSFER_SRC_BIT))
+        throw std::runtime_error("Failed to create staging buffer");
+
+    memcpy(stagingBuffer.mapped, pixels, static_cast<size_t>(stagingBuffer.sizeInBytes));
+
+    CreateVulkanImage(image);
+
+    // Change layout for transferring
+    TransitionLayout(image.image, image.format, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+
+    // Copy from Buffer
+    CopyFromBuffer(stagingBuffer, image.image, static_cast<uint32_t>(image.width), static_cast<uint32_t>(image.height));
+
+    // Change layout for shader access
+    TransitionLayout(image.image, image.format, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+
+    // Clean up
+    ImmediateDestroyVulkanBuffer(stagingBuffer);
+
+    CreateTextureImageView(image);
+    CreateTextureSampler(image);
+}
+
+
 void RenderAPI_Vulkan::CreateTextureImage(const char* filename, VulkanImage& image)
 {
     int texWidth, texHeight, texChannels;
     stbi_uc* pixels = stbi_load(filename, &texWidth, &texHeight, &texChannels, STBI_rgb_alpha);
     if (!pixels) {
-        throw std::runtime_error(stbi_failure_reason());
+        throw std::runtime_error(filename);
     }
 
     image.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;

@@ -159,6 +159,7 @@ ENDLOCAL
       <LanguageStandard>stdcpp17</LanguageStandard>
       <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
       <OmitFramePointers>true</OmitFramePointers>
+      <AdditionalIncludeDirectories>C:\Users\wayne\dev\naf\render-plugin\PluginSource\source\images;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <AdditionalDependencies>opengl32.lib;d3d12.lib</AdditionalDependencies>

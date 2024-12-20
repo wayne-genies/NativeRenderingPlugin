@@ -4,6 +4,7 @@ using System.IO;
 using System.Collections;
 using System.Runtime.InteropServices;
 using UnityEngine.Rendering;
+using UnityEngine.Networking;
 
 
 public class UseRenderingPlugin : MonoBehaviour
@@ -117,9 +118,7 @@ public class UseRenderingPlugin : MonoBehaviour
             CreateRenderTexture();
         }
 
-        CreateTextures(
-            Path.Join(Application.streamingAssetsPath, image1),
-            Path.Join(Application.streamingAssetsPath, image2));
+        CreateTextures("", "");
 
         // Debug Texture
         IntPtr texHandle = GetNativeTexture();
