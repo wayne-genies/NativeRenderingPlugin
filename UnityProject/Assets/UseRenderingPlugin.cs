@@ -53,17 +53,21 @@ public class UseRenderingPlugin : MonoBehaviour
     private static extern void RegisterPlugin();
 #endif
 
-    // DX12 plugin has a few additional exported functions
-
-#if (UNITY_EDITOR_WIN || UNITY_STANDALONE_WIN || UNITY_WSA || UNITY_WSA_10_0)
-    [DllImport("RenderingPlugin")]
-    private static extern IntPtr GetRenderTexture();
-
     [DllImport("RenderingPlugin")]
     private static extern IntPtr GetNativeTexture();
 
     [DllImport("RenderingPlugin")]
     private static extern void CreateTextures(string image1, string image2);
+
+
+    public string image1;
+    public string image2;
+
+    // DX12 plugin has a few additional exported functions
+
+#if (UNITY_EDITOR_WIN || UNITY_STANDALONE_WIN || UNITY_WSA || UNITY_WSA_10_0)
+    [DllImport("RenderingPlugin")]
+    private static extern IntPtr GetRenderTexture();
 
     [DllImport("RenderingPlugin")]
     private static extern void SetRenderTexture(IntPtr rb);
@@ -85,9 +89,6 @@ public class UseRenderingPlugin : MonoBehaviour
 
     private static RenderTexture renderTex;
     private static GameObject pluginInfo;
-
-    public string image1;
-    public string image2;
 
     private void CreateRenderTexture()
     {
