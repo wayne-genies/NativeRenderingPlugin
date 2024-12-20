@@ -341,6 +341,12 @@ extern "C" UNITY_INTERFACE_EXPORT void* UNITY_INTERFACE_API GetNativeTexture()
 	return s_CurrentAPI->getNativeTexture();
 }
 
+extern "C" UNITY_INTERFACE_EXPORT void UNITY_INTERFACE_API CreateTextures(const char* image1, const char* image2)
+{
+	return s_CurrentAPI->createTextures(image1, image2);
+}
+
+
 // --------------------------------------------------------------------------
 // DX12 plugin specific
 // --------------------------------------------------------------------------

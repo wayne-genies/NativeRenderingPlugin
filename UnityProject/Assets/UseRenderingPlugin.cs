@@ -116,9 +116,9 @@ public class UseRenderingPlugin : MonoBehaviour
             CreateRenderTexture();
         }
 
-        //CreateTextures(
-        //    Path.Join(Application.streamingAssetsPath, image1), 
-        //    Path.Join(Application.streamingAssetsPath, image2));
+        CreateTextures(
+            Path.Join(Application.streamingAssetsPath, image1),
+            Path.Join(Application.streamingAssetsPath, image2));
 
         // Debug Texture
         IntPtr texHandle = GetNativeTexture();
