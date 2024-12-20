@@ -1,5 +1,6 @@
 using UnityEngine;
 using System;
+using System.IO;
 using System.Collections;
 using System.Runtime.InteropServices;
 using UnityEngine.Rendering;
@@ -62,6 +63,9 @@ public class UseRenderingPlugin : MonoBehaviour
     private static extern IntPtr GetNativeTexture();
 
     [DllImport("RenderingPlugin")]
+    private static extern void CreateTextures(string image1, string image2);
+
+    [DllImport("RenderingPlugin")]
     private static extern void SetRenderTexture(IntPtr rb);
 
     [DllImport("RenderingPlugin")]
@@ -81,6 +85,9 @@ public class UseRenderingPlugin : MonoBehaviour
 
     private static RenderTexture renderTex;
     private static GameObject pluginInfo;
+
+    public string image1;
+    public string image2;
 
     private void CreateRenderTexture()
     {
@@ -103,14 +110,17 @@ public class UseRenderingPlugin : MonoBehaviour
 #if PLATFORM_SWITCH && !UNITY_EDITOR
         RegisterPlugin();
 #endif
-        Debug.Log(SystemInfo.graphicsDeviceType);
-        
 
         if (SystemInfo.graphicsDeviceType == GraphicsDeviceType.Direct3D12)
         {
             CreateRenderTexture();
         }
 
+        //CreateTextures(
+        //    Path.Join(Application.streamingAssetsPath, image1), 
+        //    Path.Join(Application.streamingAssetsPath, image2));
+
+        // Debug Texture
         IntPtr texHandle = GetNativeTexture();
         Texture2D renderTex = Texture2D.CreateExternalTexture(512, 512, TextureFormat.RGBA32, false, false, texHandle);
         GameObject sphere = GameObject.Find("Sphere");

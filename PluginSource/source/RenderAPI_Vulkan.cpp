@@ -561,6 +561,7 @@ public:
     virtual void drawToRenderTexture();
     virtual void drawToPluginTexture();
     virtual void* getNativeTexture();
+    virtual void createTextures(const char* image1, const char* image2);
 
 private:
     typedef std::vector<VulkanBuffer> VulkanBuffers;
@@ -573,7 +574,7 @@ private:
     void SafeDestroy(unsigned long long frameNumber, const VulkanBuffer& buffer);
     void GarbageCollect(bool force = false);
     void TransitionLayout(VkImage image, VkFormat format, VkImageLayout oldLayout, VkImageLayout newLayout);
-    void CreateVulkanImage(int texWidth, int texHeight, VkFormat format, VkImage& image, VkDeviceMemory& imageMemory);
+    void CreateVulkanImage(VulkanImage& image);
     void CreateCommandPool();
 	void CreateTextureImage(const char* filename, VulkanImage& image);
     void CreateTextureImageView(VulkanImage& image);
@@ -582,7 +583,6 @@ private:
     void CreateDescriptorPool();
     void CreateDescriptorSets();
     void CopyFromBuffer(VulkanBuffer& buffer, VkImage& image, uint32_t width, uint32_t height);
-    void InitResources();
 
 
 private:
@@ -637,7 +637,7 @@ void RenderAPI_Vulkan::ProcessDeviceEvent(UnityGfxDeviceEventType type, IUnityIn
         LoadVulkanAPI(m_Instance.getInstanceProcAddr, m_Instance.instance);
 
         // Create Vulkan resources
-        InitResources();
+        createTextures("C:\\Users\\wayne\\OneDrive\\Pictures\\texture.jpg", "C:\\Users\\wayne\\OneDrive\\Pictures\\swirl.png");
 
         UnityVulkanPluginEventConfig config_1;
         config_1.graphicsQueueAccess = kUnityVulkanGraphicsQueueAccess_DontCare;
@@ -680,6 +680,8 @@ void RenderAPI_Vulkan::ProcessDeviceEvent(UnityGfxDeviceEventType type, IUnityIn
             {
                 vkDestroyCommandPool(m_Instance.device, m_CommandPool, NULL);
             }
+
+			m_DescriptorSets.clear();
         }
 
         m_UnityVulkan = NULL;
@@ -705,15 +707,24 @@ void* RenderAPI_Vulkan::getNativeTexture()
     return &m_Image2.image;
 }
 
-
-void RenderAPI_Vulkan::InitResources()
+void RenderAPI_Vulkan::createTextures(const char* image1, const char* image2)
 {
-    CreateCommandPool();
-    CreateTextureImage("C:\\Users\\wayne\\OneDrive\\Pictures\\texture.jpg", m_Image1);
-    CreateTextureImage("C:\\Users\\wayne\\OneDrive\\Pictures\\swirl.png", m_Image2);
-    CreateDescriptorSetLayout();
-    CreateDescriptorPool();
-    CreateDescriptorSets();
+    if (m_CommandPool == VK_NULL_HANDLE)
+        CreateCommandPool();  // Reuse Command Pool
+
+	// Create texture image
+    ImmediateDestroyVulkanImage(m_Image1);
+	CreateTextureImage(image1, m_Image1);
+
+	ImmediateDestroyVulkanImage(m_Image2);
+	CreateTextureImage(image2, m_Image2);
+
+    if (m_DescriptorSetLayout == VK_NULL_HANDLE)
+		CreateDescriptorSetLayout();  // Reuse Descriptor Set Layout
+	if (m_DescriptorPool == VK_NULL_HANDLE)
+		CreateDescriptorPool();  // Reuse Descriptor Pool
+ 
+	CreateDescriptorSets();
 }
 
 void RenderAPI_Vulkan::CreateDescriptorSetLayout()
@@ -766,16 +777,18 @@ void RenderAPI_Vulkan::CreateDescriptorPool()
 
 void RenderAPI_Vulkan::CreateDescriptorSets()
 {
-    // Allocate descriptor set
-    VkDescriptorSetAllocateInfo allocInfo{};
-    allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
-    allocInfo.descriptorPool = m_DescriptorPool;
-    allocInfo.descriptorSetCount = 1;
-    allocInfo.pSetLayouts = &m_DescriptorSetLayout;
+    if (m_DescriptorSets.size() == 0)
+    {
+        VkDescriptorSetAllocateInfo allocInfo{};
+        allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+        allocInfo.descriptorPool = m_DescriptorPool;
+        allocInfo.descriptorSetCount = 1;
+        allocInfo.pSetLayouts = &m_DescriptorSetLayout;
 
-    m_DescriptorSets.resize(1);
-    if (vkAllocateDescriptorSets(m_Instance.device, &allocInfo, m_DescriptorSets.data()) != VK_SUCCESS)
-        throw std::runtime_error("Failed to allocate descriptor sets!");
+        m_DescriptorSets.resize(1);
+        if (vkAllocateDescriptorSets(m_Instance.device, &allocInfo, m_DescriptorSets.data()) != VK_SUCCESS)
+            throw std::runtime_error("Failed to allocate descriptor sets!");
+    }
 
     // Update descriptor set
     VkDescriptorImageInfo imageInfo[2];
@@ -865,18 +878,18 @@ void RenderAPI_Vulkan::CreateCommandPool()
     }
 }
 
-void RenderAPI_Vulkan::CreateVulkanImage(int texWidth, int texHeight, VkFormat format, VkImage& image, VkDeviceMemory& imageMemory)
+void RenderAPI_Vulkan::CreateVulkanImage(VulkanImage& image)
 {
     VkImageCreateInfo imageInfo{};
     imageInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
     imageInfo.imageType = VK_IMAGE_TYPE_2D;
-    imageInfo.extent.width = static_cast<uint32_t>(texWidth);
-    imageInfo.extent.height = static_cast<uint32_t>(texHeight);
+    imageInfo.extent.width = static_cast<uint32_t>(image.width);
+    imageInfo.extent.height = static_cast<uint32_t>(image.height);
     imageInfo.extent.depth = 1;
     imageInfo.mipLevels = 1;
     imageInfo.arrayLayers = 1;
 
-    imageInfo.format = format;
+    imageInfo.format = image.format;
     imageInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
     imageInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
     imageInfo.usage = VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
@@ -884,11 +897,11 @@ void RenderAPI_Vulkan::CreateVulkanImage(int texWidth, int texHeight, VkFormat f
     imageInfo.samples = VK_SAMPLE_COUNT_1_BIT;
     imageInfo.flags = 0;
 
-    if (vkCreateImage(m_Instance.device, &imageInfo, nullptr, &image) != VK_SUCCESS)
+    if (vkCreateImage(m_Instance.device, &imageInfo, nullptr, &image.image) != VK_SUCCESS)
         throw std::runtime_error("Failed to create vulkan image.");
 
     VkMemoryRequirements memRequirements;
-    vkGetImageMemoryRequirements(m_Instance.device, image, &memRequirements);
+    vkGetImageMemoryRequirements(m_Instance.device, image.image, &memRequirements);
 
     VkPhysicalDeviceMemoryProperties physicalDeviceProperties;
     vkGetPhysicalDeviceMemoryProperties(m_Instance.physicalDevice, &physicalDeviceProperties);
@@ -905,11 +918,11 @@ void RenderAPI_Vulkan::CreateVulkanImage(int texWidth, int texHeight, VkFormat f
 
     allocInfo.memoryTypeIndex = memoryTypeIndex;
 
-    if (vkAllocateMemory(m_Instance.device, &allocInfo, nullptr, &imageMemory) != VK_SUCCESS) {
+    if (vkAllocateMemory(m_Instance.device, &allocInfo, nullptr, &image.deviceMemory) != VK_SUCCESS) {
         throw std::runtime_error("Failed to allocate image memory.");
     }
 
-    vkBindImageMemory(m_Instance.device, image, imageMemory, 0);
+    vkBindImageMemory(m_Instance.device, image.image, image.deviceMemory, 0);
 }
 
 void RenderAPI_Vulkan::TransitionLayout(VkImage image, VkFormat format, VkImageLayout oldLayout, VkImageLayout newLayout)
@@ -1073,18 +1086,16 @@ void RenderAPI_Vulkan::CreateTextureImage(const char* filename, VulkanImage& ima
 
     stbi_image_free(pixels);
 
-    VkFormat format = VK_FORMAT_R8G8B8A8_SRGB;
-
-    CreateVulkanImage(texWidth, texHeight, format, image.image, image.deviceMemory);
+    CreateVulkanImage(image);
 
     // Change layout for transferring
-    TransitionLayout(image.image, format, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+    TransitionLayout(image.image, image.format, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
     
     // Copy from Buffer
     CopyFromBuffer(stagingBuffer, image.image, static_cast<uint32_t>(texWidth), static_cast<uint32_t>(texHeight));
     
     // Change layout for shader access
-    TransitionLayout(image.image, format, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+    TransitionLayout(image.image, image.format, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 
     // Clean up
     ImmediateDestroyVulkanBuffer(stagingBuffer);

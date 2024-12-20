@@ -50,6 +50,8 @@ public:
 	// Get the texture that's created natively
 	virtual void* getNativeTexture() { return nullptr; }
 
+	virtual void createTextures(const char* image1, const char* image2) {}
+
 	// --------------------------------------------------------------------------
 	// DX12 plugin specific functions
 	// --------------------------------------------------------------------------
@@ -84,8 +86,6 @@ public:
 	virtual unsigned int getSyncInterval() { return 0; }
 	virtual unsigned int getBackbufferWidth() { return 0;  }
 	virtual unsigned int getBackbufferHeight() { return 0; }
-
-	virtual void createTexture() {}
 };
 
 
