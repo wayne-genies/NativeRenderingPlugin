@@ -1,0 +1,1 @@
+glslc -mfmt=num shader.frag shader.vert -c
